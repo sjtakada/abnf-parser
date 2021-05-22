@@ -297,7 +297,7 @@ impl Parser {
                 }
             }
 
-            // 2. find defined-as (=) or Incremental(=/).
+            // 2. find defined-as (=) or Incremental Alternatives(=/).
             loop {
                 let token = self.get_token()?;
                 match token {
@@ -336,7 +336,7 @@ impl Parser {
                                 };
 
                                 match self.parse_rule() {
-                                    // If one or both rep(s) is/are selection, try to merge, or append.
+                                    // If one or both rep(s) is/are selection, try to merge.
                                     Ok(rep) => {
                                         match rep.element {
                                             Element::Rulename(_) |
