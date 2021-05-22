@@ -1,2 +1,2 @@
 # abnf-parser
-ABNF parser
+Simple ABNF parser in Rust.
