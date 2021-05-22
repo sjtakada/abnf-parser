@@ -665,4 +665,56 @@ mod test {
             Ok(_) => assert!(false, "Not OK"),
         }
     }
+
+    // test 2
+
+    #[test]
+    pub fn test_parse_6() {
+        let str = r#"
+            ruleset  = alt1 / alt2
+
+            ruleset =/ alt3
+
+            ruleset =/ alt4 / alt5
+        "#;
+        let mut parser = Parser::new(str.to_string());
+        match parser.parse() {
+            Err(e) => assert!(false, "error {:?}", e),
+            Ok(r) => {
+                let rep = r.get("ruleset").unwrap();
+                assert_eq!(rep, &Repetition {
+                    repeat: None,
+                    element: Element::Selection(vec![Repetition { repeat: None, element: Element::Rulename("alt1".to_string()) },
+                                                     Repetition { repeat: None, element: Element::Rulename("alt2".to_string()) },
+                                                     Repetition { repeat: None, element: Element::Rulename("alt3".to_string()) },
+                                                     Repetition { repeat: None, element: Element::Rulename("alt4".to_string()) },
+                                                     Repetition { repeat: None, element: Element::Rulename("alt5".to_string()) }]) })
+            }
+        }
+    }
+
+    #[test]
+    pub fn test_parse_7() {
+        let str = r#"
+            ruleset  = alt1 
+
+            ruleset =/ alt2 / alt3
+
+            ruleset =/ alt4 / alt5
+        "#;
+        let mut parser = Parser::new(str.to_string());
+        match parser.parse() {
+            Err(e) => assert!(false, "error {:?}", e),
+            Ok(r) => {
+                let rep = r.get("ruleset").unwrap();
+                assert_eq!(rep, &Repetition {
+                    repeat: None,
+                    element: Element::Selection(vec![Repetition { repeat: None, element: Element::Rulename("alt1".to_string()) },
+                                                     Repetition { repeat: None, element: Element::Rulename("alt2".to_string()) },
+                                                     Repetition { repeat: None, element: Element::Rulename("alt3".to_string()) },
+                                                     Repetition { repeat: None, element: Element::Rulename("alt4".to_string()) },
+                                                     Repetition { repeat: None, element: Element::Rulename("alt5".to_string()) }]) })
+            }
+        }
+    }
 }
