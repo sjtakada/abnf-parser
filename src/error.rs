@@ -21,6 +21,12 @@ quick_error! {
         ExpectRules(line: usize, pos: usize) {
             display("line: {}, pos: {}, Expect rules", line, pos)
         }
+        RuleExist(line: usize, pos: usize) {
+            display("line: {}, pos: {}, Rule already exists", line, pos)
+        }
+        RuleNotExist(line: usize, pos: usize) {
+            display("line: {}, pos: {}, Rule does not exist", line, pos)
+        }
         TokenParseError(line: usize, pos: usize) {
             display("line: {}, pos: {}, Token parse error", line, pos)
         }

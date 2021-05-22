@@ -4,7 +4,7 @@
 //
 
 use std::env;
-use yang_abnf_rs::parser;
+use abnf_parser::parser;
 
 /// Show help.
 fn print_help(program: &str) {

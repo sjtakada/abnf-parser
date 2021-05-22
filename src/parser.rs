@@ -18,7 +18,7 @@ use std::cell::Cell;
 use super::error::*;
 
 /// An individual element in an ABNF rule.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Element {
     /// rulename.
     Rulename(String),
@@ -31,7 +31,7 @@ pub enum Element {
 }
 
 /// Repeat.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Repeat {
     min: Option<usize>,
     max: Option<usize>,
@@ -47,7 +47,7 @@ impl Repeat {
 }
 
 /// Element with repeat.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Repetition {
     repeat: Option<Repeat>,
     element: Element,
@@ -306,15 +306,57 @@ impl Parser {
                         // Do nothing.
                     }
                     Token::DefinedAs => {
-                        match self.parse_rule() {
-                            Ok(rep) => rulelist.insert(rulename.take().unwrap(), rep),
-                            Err(err) => return Err(err),
-                        };
+                        let rulename = rulename.take().unwrap();
+
+                        match rulelist.get(&rulename) {
+                            Some(_) => return Err(AbnfParseError::RuleExist(self.line(), self.pos())),
+                            None => {
+                                match self.parse_rule() {
+                                    Ok(rep) => rulelist.insert(rulename, rep),
+                                    Err(err) => return Err(err),
+                                };
+                            }
+                        }
 
                         break;
                     }
                     Token::Incremental => {
-                        // TODO
+                        let rulename = rulename.take().unwrap();
+
+                        match rulelist.remove(&rulename) {
+                            Some(rep) => {
+                                let mut v = match rep.element {
+                                    Element::Rulename(_) |
+                                    Element::Literal(_) |
+                                    Element::Sequence(_) => {
+                                        let v: Vec<Repetition> = vec![ rep.clone() ];
+                                        v
+                                    }
+                                    Element::Selection(v) => v,
+                                };
+
+                                match self.parse_rule() {
+                                    // If one or both rep(s) is/are selection, try to merge, or append.
+                                    Ok(rep) => {
+                                        match rep.element {
+                                            Element::Rulename(_) |
+                                            Element::Literal(_) |
+                                            Element::Sequence(_) => {
+                                                v.push(rep);
+                                            }
+                                            Element::Selection(mut w) => {
+                                                v.append(&mut w);
+                                            }
+                                        }
+                                    }
+                                    Err(err) => return Err(err),
+                                }
+
+                                rulelist.insert(rulename, Repetition::new(None, Element::Selection(v)));
+                            }
+                            None => return Err(AbnfParseError::RuleNotExist(self.line(), self.pos())),
+                        }
+
                         break;
                     }
                     _ => return Err(AbnfParseError::ExpectDefinedAs(self.line(), self.pos())),
