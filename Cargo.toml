@@ -3,6 +3,12 @@ name = "abnf-parser"
 version = "0.1.0"
 authors = ["Toshiaki Takada <toshi@reze.rs>"]
 edition = "2018"
+description = "ABNF Parser"
+repository = "https://github.com/sjtakada/abnf-parser"
+readme = "README.md"
+keywords = ["ABNF", "parser"]
+license = "Apache-2.0"
+categories = ["network-programming", "parser-implementations"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
