@@ -15,8 +15,10 @@ use super::error::*;
 pub enum Element {
     /// rulename.
     Rulename(String),
-    /// char-val.
-    CharValue(String),
+    /// case insensitive string.
+    IString(String),
+    /// case seisitve string.
+    SString(String),
     /// num-val.
     NumberValue(u32),
     /// range of num-val.
@@ -63,15 +65,6 @@ impl Repetition {
     }
 }
 
-/// Char Value.
-#[derive(PartialEq, Debug)]
-pub struct CharValue {
-    /// Is case sensitive.
-    case: bool,
-    /// String value.
-    value: String,
-}
-
 /// Rulelist.
 type Rulelist = HashMap<String, Repetition>;
 
@@ -83,7 +76,8 @@ pub enum Token {
     Rulename(String),
     DefinedAs,
     Incremental,
-    CharValue(String),
+    IString(String),
+    SString(String),
     NumberValue(u32),
     ValueRange((u32, u32)),
     ValueSequence(Vec<u32>),
@@ -183,7 +177,7 @@ impl Parser {
                 None => return Err(AbnfParseError::TokenParseError(self.line(), self.pos())),
             };
 
-            token = Token::CharValue(String::from(&l[..pos]));
+            token = Token::IString(String::from(&l[..pos]));
             pos += 2;
         } else if input.starts_with(char::is_alphabetic) {
             pos = match input.find(|c: char| !c.is_alphanumeric() && c != '-') {
@@ -195,7 +189,7 @@ impl Parser {
         } else if input.starts_with('%') {
             let mut l = &input[1..];
             if l.starts_with(|c: char| c == 's' || c == 'i') {
-                let _case = if l.starts_with('s') {
+                let case = if l.starts_with('s') {
                     true
                 } else {
                     false
@@ -212,14 +206,13 @@ impl Parser {
                     None => return Err(AbnfParseError::TokenParseError(self.line(), self.pos())),
                 };
 
-                token = Token::CharValue(String::from(&l[..pos]));
-                pos += 3;
+                if case {
+                    token = Token::SString(String::from(&l[..pos]));
+                } else {
+                    token = Token::IString(String::from(&l[..pos]));
+                }
+                pos += 4;
             } else if l.starts_with(|c: char| c == 'b' || c == 'd' || c == 'x') {
-                pos = match l.find(|c:char| !c.is_alphanumeric() && c != '.' && c != '-') {
-                    Some(pos) => pos,
-                    None => l.len(),
-                };
-
                 let radix = if l.starts_with('b') {
                     2
                 } else if l.starts_with('d') {
@@ -228,7 +221,13 @@ impl Parser {
                     16
                 };
 
-                l = &l[1..pos];
+                l = &l[1..];
+                pos = match l.find(|c: char| !c.is_alphanumeric() && c != '.' && c != '-') {
+                    Some(pos) => pos,
+                    None => l.len(),
+                };
+
+                l = &l[..pos];
 
                 if let Some(_) = l.find('-') {
                     let v: Vec<&str> = l.split("-").collect();
@@ -236,20 +235,27 @@ impl Parser {
                         return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
                      }
 
-                    let rbegin = u32::from_str_radix(v[0], radix).unwrap();
-                    let rend = u32::from_str_radix(v[1], radix).unwrap();
+                    let rbegin = if let Ok(r) = u32::from_str_radix(v[0], radix) {
+                        r
+                    } else {
+                        return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
+                    };
+                    let rend = if let Ok(r) = u32::from_str_radix(v[1], radix) {
+                        r
+                    } else {
+                        return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
+                    };
 
                     token = Token::ValueRange((rbegin, rend));
-
                 } else if let Some(_) = l.find('.') {
-                    let v: Vec<u32> = l.split("-").map(|s| u32::from_str_radix(s, radix).unwrap()).collect();
+                    let v: Vec<u32> = l.split(".").map(|s| u32::from_str_radix(s, radix).unwrap()).collect();
                     token = Token::ValueSequence(v);
                 } else {
                     let val = u32::from_str_radix(l, radix).unwrap();
                     token = Token::NumberValue(val);
                 }
 
-                pos += 1;
+                pos += 2;
             } else {
                 return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
             }
@@ -440,8 +446,11 @@ impl Parser {
                 Token::Rulename(name) => {
                     v.push(Repetition::new(repeat.take(), Element::Rulename(name)));
                 }
-                Token::CharValue(val) => {
-                    v.push(Repetition::new(repeat.take(), Element::CharValue(val)));
+                Token::IString(val) => {
+                    v.push(Repetition::new(repeat.take(), Element::IString(val)));
+                }
+                Token::SString(val) => {
+                    v.push(Repetition::new(repeat.take(), Element::SString(val)));
                 }
                 Token::NumberValue(val) => {
                     v.push(Repetition::new(repeat.take(), Element::NumberValue(val)));
@@ -610,6 +619,74 @@ mod test {
     }
 
     #[test]
+    pub fn test_get_token_5() {
+        let str = r#"%s"Hello" %i"world""#;
+        let mut parser = Parser::new(str.to_string());
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::SString("Hello".to_string()));
+        assert_eq!(parser.pos(), 9);
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::Whitespace(" ".to_string()));
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::IString("world".to_string()));
+        assert_eq!(parser.pos(), 19);
+    }
+
+    #[test]
+    pub fn test_get_token_6() {
+        let str = "%x20 %b01010101  %d12345";
+        let mut parser = Parser::new(str.to_string());
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::NumberValue(32));
+        assert_eq!(parser.pos(), 4);
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::Whitespace(" ".to_string()));
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::NumberValue(0x55));
+        assert_eq!(parser.pos(), 15);
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::Whitespace("  ".to_string()));
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::NumberValue(12345));
+        assert_eq!(parser.pos(), 24);
+    }
+
+    #[test]
+    pub fn test_get_token_7() {
+        let str = "%x20-D7FF %xE000-FDCF";
+        let mut parser = Parser::new(str.to_string());
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::ValueRange((0x20, 0xd7ff)));
+        assert_eq!(parser.pos(), 9);
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::Whitespace(" ".to_string()));
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::ValueRange((0xe000, 0xfdcf)));
+        assert_eq!(parser.pos(), 21);
+    }
+
+    #[test]
+    pub fn test_get_token_8() {
+        let str = "%x20.21.22";
+        let mut parser = Parser::new(str.to_string());
+
+        let token = parser.get_token().unwrap();
+        assert_eq!(token, Token::ValueSequence(vec![0x20, 0x21, 0x22]));
+        assert_eq!(parser.pos(), 10);
+    }
+
+    #[test]
     pub fn test_get_token_invalid_1() {
         let str = "   !";
         let mut parser = Parser::new(str.to_string());
@@ -617,6 +694,18 @@ mod test {
         let token = parser.get_token().unwrap();
         assert_eq!(token, Token::Whitespace("   ".to_string()));
 
+        match parser.get_token() {
+            Err(AbnfParseError::TokenParseError(0, 3)) => { },
+            Err(err) => assert!(false, "{:?}", err),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    pub fn test_get_token_invalid_2() {
+        let str = "%x20.21-22";
+        let mut parser = Parser::new(str.to_string());
+        
         match parser.get_token() {
             Err(AbnfParseError::TokenParseError(0, 3)) => { },
             Err(err) => assert!(false, "{:?}", err),
@@ -659,7 +748,7 @@ mod test {
                                                                   Repetition { repeat: None,
                                                                                element: Element::Rulename("DIGIT".to_string()) },
                                                                   Repetition { repeat: None,
-                                                                               element: Element::CharValue("-".to_string()) }]) }])
+                                                                               element: Element::IString("-".to_string()) }]) }])
         };
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -698,8 +787,8 @@ mod test {
                 vec![Repetition { repeat: Some(Repeat { min: None, max: None }),
                                   element: Element::Rulename("c-wsp".to_string()) },
                      Repetition { repeat: None, element: Element::Selection(
-                         vec![Repetition { repeat: None, element: Element::CharValue("=".to_string()) },
-                              Repetition { repeat: None, element: Element::CharValue("=/".to_string()) }]) },
+                         vec![Repetition { repeat: None, element: Element::IString("=".to_string()) },
+                              Repetition { repeat: None, element: Element::IString("=/".to_string()) }]) },
                      Repetition { repeat: Some(Repeat { min: None, max: None }),
                                   element: Element::Rulename("c-wsp".to_string()) }])
         };
@@ -743,11 +832,11 @@ mod test {
         let rep = Repetition {
             repeat: None,
             element: Element::Sequence(
-                vec![Repetition { repeat: None, element: Element::CharValue("(".to_string()) },
+                vec![Repetition { repeat: None, element: Element::IString("(".to_string()) },
                      Repetition { repeat: Some(Repeat { min: None, max: None }), element: Element::Rulename("c-wsp".to_string()) },
                      Repetition { repeat: None, element: Element::Rulename("alternation".to_string()) },
                      Repetition { repeat: Some(Repeat { min: None, max: None }), element: Element::Rulename("c-wsp".to_string()) },
-                     Repetition { repeat: None, element: Element::CharValue(")".to_string()) }]) };
+                     Repetition { repeat: None, element: Element::IString(")".to_string()) }]) };
 
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -764,7 +853,7 @@ mod test {
             repeat: None,
             element: Element::Sequence(
                 vec![Repetition { repeat: None,
-                                  element: Element::CharValue("d".to_string()) },
+                                  element: Element::IString("d".to_string()) },
                      Repetition { repeat: Some(Repeat { min: Some(1), max: None }),
                                   element: Element::Rulename("DIGIT".to_string()) },
                      Repetition { repeat: Some(Repeat { min: Some(0), max: Some(1) }),
@@ -772,13 +861,13 @@ mod test {
                                       vec![Repetition { repeat: Some(Repeat { min: Some(1), max: None }),
                                                         element: Element::Sequence(
                                                             vec![Repetition { repeat: None,
-                                                                              element: Element::CharValue(".".to_string()) },
+                                                                              element: Element::IString(".".to_string()) },
                                                                  Repetition { repeat: Some(Repeat { min: Some(1), max: None }),
                                                                               element: Element::Rulename("DIGIT".to_string()) }]) },
                                            Repetition { repeat: None,
                                                         element: Element::Sequence(
                                                             vec![Repetition { repeat: None,
-                                                                              element: Element::CharValue("-".to_string()) },
+                                                                              element: Element::IString("-".to_string()) },
                                                                  Repetition { repeat: Some(Repeat { min: Some(1), max: None }),
                                                                               element: Element::Rulename("DIGIT".to_string())
                                                                  }])
