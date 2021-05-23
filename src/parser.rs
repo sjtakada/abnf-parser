@@ -699,7 +699,7 @@ mod test {
         let mut parser = Parser::new(str.to_string());
         
         match parser.get_token() {
-            Err(AbnfParseError::TokenParseError) => { },
+            Err(AbnfParseError::ParseIntError) => { },
             Err(err) => assert!(false, "{:?}", err),
             _ => assert!(false),
         }
