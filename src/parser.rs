@@ -3,13 +3,6 @@
 //   Copyright (C) 2021 Toshiaki Takada
 //
 
-// TODO
-// - Char value, range value, better struct
-// - RFC7405
-// - Grouping check
-// - Dumping format
-// - Incremental
-
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::HashMap;
@@ -22,8 +15,16 @@ use super::error::*;
 pub enum Element {
     /// rulename.
     Rulename(String),
-    /// char-val, num-val, or prose-val.
-    Literal(String),
+    /// char-val.
+    CharValue(String),
+    /// num-val.
+    NumberValue(u32),
+    /// range of num-val.
+    ValueRange((u32, u32)),
+    /// sequence of num-val.
+    ValueSequence(Vec<u32>),
+    /// prose-val.
+    ProseValue(String),
     /// concatination.
     Sequence(Vec<Repetition>),
     /// alternation.
@@ -62,6 +63,15 @@ impl Repetition {
     }
 }
 
+/// Char Value.
+#[derive(PartialEq, Debug)]
+pub struct CharValue {
+    /// Is case sensitive.
+    case: bool,
+    /// String value.
+    value: String,
+}
+
 /// Rulelist.
 type Rulelist = HashMap<String, Repetition>;
 
@@ -74,8 +84,9 @@ pub enum Token {
     DefinedAs,
     Incremental,
     CharValue(String),
-    NumValue(String),
-    ValueRange(String),
+    NumberValue(u32),
+    ValueRange((u32, u32)),
+    ValueSequence(Vec<u32>),
     ProseVal(String),
     OptionalBegin,
     OptionalEnd,
@@ -131,7 +142,7 @@ impl Parser {
         self.line.get()
     }
 
-    /// Add line number.
+    /// Add len to line number.
     pub fn line_add(&self, len: usize) {
         self.line.set(self.line.get() + len);
     }
@@ -152,7 +163,7 @@ impl Parser {
             self.line_add(v.len());
 
             token = Token::Whitespace(String::from(l));
-        } else if input.starts_with(";") {
+        } else if input.starts_with(';') {
             pos = match input.find(|c: char| c == '\r' || c == '\n') {
                 Some(pos) => pos,
                 None => input.len(),
@@ -162,17 +173,17 @@ impl Parser {
         } else if input.starts_with("=/") {
             pos = 2;
             token = Token::Incremental;
-        } else if input.starts_with("=") {
+        } else if input.starts_with('=') {
             pos = 1;
             token = Token::DefinedAs;
-        } else if input.starts_with("\"") {
+        } else if input.starts_with('"') {
             let l = &input[1..];
-            pos = match l.find(|c: char| c == '\"') {
+            pos = match l.find(|c: char| c == '"') {
                 Some(pos) => pos,
                 None => return Err(AbnfParseError::TokenParseError(self.line(), self.pos())),
             };
 
-            token = Token::CharValue(String::from(&input[1..pos + 1]));
+            token = Token::CharValue(String::from(&l[..pos]));
             pos += 2;
         } else if input.starts_with(char::is_alphabetic) {
             pos = match input.find(|c: char| !c.is_alphanumeric() && c != '-') {
@@ -181,20 +192,65 @@ impl Parser {
             };
 
             token = Token::Rulename(String::from(&input[..pos]));
-        } else if input.starts_with("%") {
+        } else if input.starts_with('%') {
             let mut l = &input[1..];
-            pos = match l.find(|c: char| !c.is_alphanumeric() && c != '.' && c != '-') {
-                Some(pos) => pos,
-                None => input.len(),
-            };
+            if l.starts_with("s") || l.starts_with("i") {
+                let _case = if l.starts_with("s") {
+                    true
+                } else {
+                    false
+                };
 
-            l = &input[..pos + 1];
+                l = &input[2..];
+                if !l.starts_with('"') {
+                    return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
+                }
 
-            match l.find('-') {
-                Some(_) => token = Token::ValueRange(String::from(l)),
-                None => token = Token::CharValue(String::from(l)),
+                l = &input[3..];
+                pos = match l.find(|c: char| c == '"') {
+                    Some(pos) => pos,
+                    None => return Err(AbnfParseError::TokenParseError(self.line(), self.pos())),
+                };
+
+                token = Token::CharValue(String::from(&l[..pos]));
+                pos += 3;
+            } else if l.starts_with(|c: char| c == 'b' || c == 'd' || c == 'x') {
+                pos = match l.find(char::is_whitespace) {
+                    Some(pos) => pos,
+                    None => l.len(),
+                };
+
+                let radix = if l.starts_with('b') {
+                    2
+                } else if l.starts_with('d') {
+                    10
+                } else {
+                    16
+                };
+
+                l = &l[1..pos];
+
+                if let Some(_) = l.find('-') {
+                    let v: Vec<&str> = l.split("-").collect();
+                    if v.len() != 2 {
+                        return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
+                     }
+
+                    let rbegin = u32::from_str_radix(v[0], radix).unwrap();
+                    let rend = u32::from_str_radix(v[1], radix).unwrap();
+
+                    token = Token::ValueRange((rbegin, rend));
+
+                } else if let Some(_) = l.find('.') {
+                    let v: Vec<u32> = l.split("-").map(|s| u32::from_str_radix(s, radix).unwrap()).collect();
+                    token = Token::ValueSequence(v);
+                } else {
+                    let val = u32::from_str_radix(l, radix).unwrap();
+                    token = Token::NumberValue(val);
+                }
+            } else {
+                return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
             }
-            pos += 1;
         } else if input.starts_with("<") {
             let l = &input[1..];
             pos = match l.find(|c: char| c == '>') {
@@ -327,7 +383,11 @@ impl Parser {
                             Some(rep) => {
                                 let mut v = match rep.element {
                                     Element::Rulename(_) |
-                                    Element::Literal(_) |
+                                    Element::CharValue(_) |
+                                    Element::NumberValue(_) |
+                                    Element::ValueRange(_) |
+                                    Element::ValueSequence(_) |
+                                    Element::ProseValue(_) |
                                     Element::Sequence(_) => {
                                         let v: Vec<Repetition> = vec![ rep.clone() ];
                                         v
@@ -340,7 +400,11 @@ impl Parser {
                                     Ok(rep) => {
                                         match rep.element {
                                             Element::Rulename(_) |
-                                            Element::Literal(_) |
+                                            Element::CharValue(_) |
+                                            Element::NumberValue(_) |
+                                            Element::ValueRange(_) |
+                                            Element::ValueSequence(_) |
+                                            Element::ProseValue(_) |
                                             Element::Sequence(_) => {
                                                 v.push(rep);
                                             }
@@ -394,16 +458,19 @@ impl Parser {
                     v.push(Repetition::new(repeat.take(), Element::Rulename(name)));
                 }
                 Token::CharValue(val) => {
-                    v.push(Repetition::new(repeat.take(), Element::Literal(val)));
+                    v.push(Repetition::new(repeat.take(), Element::CharValue(val)));
                 }
-                Token::NumValue(val) => {
-                    v.push(Repetition::new(repeat.take(), Element::Literal(val)));
+                Token::NumberValue(val) => {
+                    v.push(Repetition::new(repeat.take(), Element::NumberValue(val)));
                 }
                 Token::ValueRange(val) => {
-                    v.push(Repetition::new(repeat.take(), Element::Literal(val)));
+                    v.push(Repetition::new(repeat.take(), Element::ValueRange(val)));
+                }
+                Token::ValueSequence(val) => {
+                    v.push(Repetition::new(repeat.take(), Element::ValueSequence(val)));
                 }
                 Token::ProseVal(val) => {
-                    v.push(Repetition::new(repeat.take(), Element::Literal(val)));
+                    v.push(Repetition::new(repeat.take(), Element::ProseValue(val)));
                 }
                 Token::OptionalBegin => {
                     let mut rep = self.parse_rule()?;
@@ -464,7 +531,7 @@ fn is_rule_delimiter(input: &str) -> bool {
     }
 }
 
-/// Open file and parse it as ABNF.
+/// Open and parse an ABNF definition file.
 pub fn parse_file(filename: &str) -> std::io::Result<()> {
     let mut f = File::open(filename)?;
     let mut s = String::new();
@@ -476,7 +543,6 @@ pub fn parse_file(filename: &str) -> std::io::Result<()> {
         Ok(rl) => {
             for (k, v) in rl {
                 println!("{:?} => {:?}", k, v);
-                println!("");
             }
         }
         Err(err) => {
