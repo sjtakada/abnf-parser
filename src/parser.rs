@@ -174,7 +174,7 @@ impl Parser {
             let l = &input[1..];
             pos = match l.find(|c: char| c == '"') {
                 Some(pos) => pos,
-                None => return Err(AbnfParseError::TokenParseError(self.line(), self.pos())),
+                None => return Err(AbnfParseError::TokenParseError),
             };
 
             token = Token::IString(String::from(&l[..pos]));
@@ -197,13 +197,13 @@ impl Parser {
 
                 l = &input[2..];
                 if !l.starts_with('"') {
-                    return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
+                    return Err(AbnfParseError::TokenParseError);
                 }
 
                 l = &input[3..];
                 pos = match l.find(|c: char| c == '"') {
                     Some(pos) => pos,
-                    None => return Err(AbnfParseError::TokenParseError(self.line(), self.pos())),
+                    None => return Err(AbnfParseError::TokenParseError),
                 };
 
                 if case {
@@ -232,38 +232,30 @@ impl Parser {
                 if let Some(_) = l.find('-') {
                     let v: Vec<&str> = l.split("-").collect();
                     if v.len() != 2 {
-                        return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
+                        return Err(AbnfParseError::TokenParseError);
                      }
 
-                    let rbegin = if let Ok(r) = u32::from_str_radix(v[0], radix) {
-                        r
-                    } else {
-                        return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
-                    };
-                    let rend = if let Ok(r) = u32::from_str_radix(v[1], radix) {
-                        r
-                    } else {
-                        return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
-                    };
+                    let rbegin = u32::from_str_radix(v[0], radix)?;
+                    let rend = u32::from_str_radix(v[1], radix)?;
 
                     token = Token::ValueRange((rbegin, rend));
                 } else if let Some(_) = l.find('.') {
                     let v: Vec<u32> = l.split(".").map(|s| u32::from_str_radix(s, radix).unwrap()).collect();
                     token = Token::ValueSequence(v);
                 } else {
-                    let val = u32::from_str_radix(l, radix).unwrap();
+                    let val = u32::from_str_radix(l, radix)?;
                     token = Token::NumberValue(val);
                 }
 
                 pos += 2;
             } else {
-                return Err(AbnfParseError::TokenParseError(self.line(), self.pos()));
+                return Err(AbnfParseError::TokenParseError);
             }
         } else if input.starts_with('<') {
             let l = &input[1..];
             pos = match l.find(|c: char| c == '>') {
                 Some(pos) => pos,
-                None => return Err(AbnfParseError::TokenParseError(self.line(), self.pos())),
+                None => return Err(AbnfParseError::TokenParseError),
             };
             token = Token::ProseVal(String::from(&input[1..pos + 1]));
             pos += 2;
@@ -329,7 +321,7 @@ impl Parser {
 
             token = Token::Repeat(Repeat::new(min, max));
         } else {
-            return Err(AbnfParseError::TokenParseError(self.line(), self.pos()))
+            return Err(AbnfParseError::TokenParseError);
         }
         self.pos_set(pos);
         Ok(token)
@@ -353,11 +345,11 @@ impl Parser {
                         rulename.replace(name);
                         break;
                     }
-                    _ => return Err(AbnfParseError::ExpectRulename(self.line(), self.pos(), token)),
+                    _ => return Err(AbnfParseError::ExpectRulename(token)),
                 }
 
                 if self.input_len() == 0 {
-                    return Err(AbnfParseError::ExpectRulename(self.line(), self.pos(), token));
+                    return Err(AbnfParseError::ExpectRulename(token));
                 }
             }
 
@@ -373,7 +365,7 @@ impl Parser {
                         let rulename = rulename.take().unwrap();
 
                         match rulelist.get(&rulename) {
-                            Some(_) => return Err(AbnfParseError::RuleExist(self.line(), self.pos())),
+                            Some(_) => return Err(AbnfParseError::RuleExist),
                             None => {
                                 match self.parse_rule() {
                                     Ok(rep) => rulelist.insert(rulename, rep),
@@ -407,16 +399,16 @@ impl Parser {
 
                                 rulelist.insert(rulename, Repetition::new(None, Element::Selection(v)));
                             }
-                            None => return Err(AbnfParseError::RuleNotExist(self.line(), self.pos())),
+                            None => return Err(AbnfParseError::RuleNotExist),
                         }
 
                         break;
                     }
-                    _ => return Err(AbnfParseError::ExpectDefinedAs(self.line(), self.pos())),
+                    _ => return Err(AbnfParseError::ExpectDefinedAs),
                 }
 
                 if self.input_len() == 0 {
-                    return Err(AbnfParseError::ExpectDefinedAs(self.line(), self.pos()));
+                    return Err(AbnfParseError::ExpectDefinedAs);
                 }
             }
         }
@@ -492,7 +484,7 @@ impl Parser {
                     }
                 }
                 _ => {
-                    return Err(AbnfParseError::UnexpectedToken(self.line(), self.pos(), token));
+                    return Err(AbnfParseError::UnexpectedToken(token));
                 }
             }
         }
@@ -538,7 +530,7 @@ pub fn parse_file(filename: &str) -> std::io::Result<()> {
             }
         }
         Err(err) => {
-            println!("Error: {:?}", err);
+            println!("Error: {:?} at line {}, pos {}", err, parser.line(), parser.pos());
         }
     }
 
@@ -695,7 +687,7 @@ mod test {
         assert_eq!(token, Token::Whitespace("   ".to_string()));
 
         match parser.get_token() {
-            Err(AbnfParseError::TokenParseError(0, 3)) => { },
+            Err(AbnfParseError::TokenParseError) => { },
             Err(err) => assert!(false, "{:?}", err),
             _ => assert!(false),
         }
@@ -707,7 +699,7 @@ mod test {
         let mut parser = Parser::new(str.to_string());
         
         match parser.get_token() {
-            Err(AbnfParseError::TokenParseError(0, 3)) => { },
+            Err(AbnfParseError::TokenParseError) => { },
             Err(err) => assert!(false, "{:?}", err),
             _ => assert!(false),
         }
@@ -887,7 +879,7 @@ mod test {
         let str = r#"   "Hello world""#;
         let mut parser = Parser::new(str.to_string());
         match parser.parse() {
-            Err(AbnfParseError::ExpectRulename(0, 16, _)) => {},
+            Err(AbnfParseError::ExpectRulename(_)) => {},
             Err(e) => assert!(false, "Unexpected error {:?}", e),
             Ok(_) => assert!(false, "Not OK"),
         }

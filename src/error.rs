@@ -12,26 +12,29 @@ use super::parser::*;
 quick_error! {
     #[derive(Debug)]
     pub enum AbnfParseError {
-        ExpectRulename(line: usize, pos: usize, token: Token) {
-            display("line: {}, pos: {}, Expect Rulename (found {:?})", line, pos, token)
+        ExpectRulename(token: Token) {
+            display("Expect Rulename (found {:?})", token)
         }
-        ExpectDefinedAs(line: usize, pos: usize) {
-            display("line: {}, pos: {}, Expect 'defined-as'", line, pos)
+        ExpectDefinedAs {
+            display("Expect 'defined-as'")
         }
-        ExpectRules(line: usize, pos: usize) {
-            display("line: {}, pos: {}, Expect rules", line, pos)
+        ExpectRules {
+            display("Expect rules")
         }
-        RuleExist(line: usize, pos: usize) {
-            display("line: {}, pos: {}, Rule already exists", line, pos)
+        RuleExist {
+            display("Rule already exists")
         }
-        RuleNotExist(line: usize, pos: usize) {
-            display("line: {}, pos: {}, Rule does not exist", line, pos)
+        RuleNotExist {
+            display("Rule does not exist")
         }
-        TokenParseError(line: usize, pos: usize) {
-            display("line: {}, pos: {}, Token parse error", line, pos)
+        TokenParseError {
+            display("Token parse error")
         }
-        UnexpectedToken(line: usize, pos: usize, token: Token) {
-            display("line: {}, pos: {}, Unepected token {:?}", line, pos, token)
+        UnexpectedToken(token: Token) {
+            display("Unexpected token {:?}", token)
+        }
+        ParseIntError(err: std::num::ParseIntError) {
+            from()
         }
     }
 }
