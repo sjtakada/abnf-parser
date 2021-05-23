@@ -3,8 +3,8 @@
 //   Copyright (C) 2021 Toshiaki Takada
 //
 
-use std::env;
 use abnf_parser::parser;
+use std::env;
 
 /// Show help.
 fn print_help(program: &str) {
@@ -21,7 +21,7 @@ fn main() {
         print_help(&program);
     } else {
         match parser::parse_file(&args[1]) {
-            Ok(_) => { }
+            Ok(_) => {}
             Err(e) => println!("Error: {:?}", e.to_string()),
         }
     }

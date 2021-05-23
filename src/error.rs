@@ -3,12 +3,12 @@
 //   Copyright (C) 2021 Toshiaki Takada
 //
 
-use quick_error::*;
 use super::parser::*;
+use quick_error::*;
 
 //
 // YANG ABNF Parse Error.
-// 
+//
 quick_error! {
     #[derive(Debug)]
     pub enum AbnfParseError {

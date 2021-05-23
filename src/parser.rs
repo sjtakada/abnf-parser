@@ -3,10 +3,10 @@
 //   Copyright (C) 2021 Toshiaki Takada
 //
 
+use std::cell::Cell;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::collections::HashMap;
-use std::cell::Cell;
 
 use super::error::*;
 
@@ -42,10 +42,7 @@ pub struct Repeat {
 
 impl Repeat {
     pub fn new(min: Option<usize>, max: Option<usize>) -> Repeat {
-        Repeat {
-            min,
-            max
-        }
+        Repeat { min, max }
     }
 }
 
@@ -58,10 +55,7 @@ pub struct Repetition {
 
 impl Repetition {
     pub fn new(repeat: Option<Repeat>, element: Element) -> Repetition {
-        Repetition {
-            repeat,
-            element,
-        }
+        Repetition { repeat, element }
     }
 }
 
@@ -189,11 +183,7 @@ impl Parser {
         } else if input.starts_with('%') {
             let mut l = &input[1..];
             if l.starts_with(|c: char| c == 's' || c == 'i') {
-                let case = if l.starts_with('s') {
-                    true
-                } else {
-                    false
-                };
+                let case = if l.starts_with('s') { true } else { false };
 
                 l = &input[2..];
                 if !l.starts_with('"') {
@@ -233,14 +223,17 @@ impl Parser {
                     let v: Vec<&str> = l.split("-").collect();
                     if v.len() != 2 {
                         return Err(AbnfParseError::TokenParseError);
-                     }
+                    }
 
                     let rbegin = u32::from_str_radix(v[0], radix)?;
                     let rend = u32::from_str_radix(v[1], radix)?;
 
                     token = Token::ValueRange((rbegin, rend));
                 } else if let Some(_) = l.find('.') {
-                    let v: Vec<u32> = l.split(".").map(|s| u32::from_str_radix(s, radix).unwrap()).collect();
+                    let v: Vec<u32> = l
+                        .split(".")
+                        .map(|s| u32::from_str_radix(s, radix).unwrap())
+                        .collect();
                     token = Token::ValueSequence(v);
                 } else {
                     let val = u32::from_str_radix(l, radix)?;
@@ -337,8 +330,7 @@ impl Parser {
             loop {
                 let token = self.get_token()?;
                 match token {
-                    Token::Whitespace(_) |
-                    Token::Comment(_) => {
+                    Token::Whitespace(_) | Token::Comment(_) => {
                         // Do nothing.
                     }
                     Token::Rulename(name) => {
@@ -357,8 +349,7 @@ impl Parser {
             loop {
                 let token = self.get_token()?;
                 match token {
-                    Token::Whitespace(_) |
-                    Token::Comment(_) => {
+                    Token::Whitespace(_) | Token::Comment(_) => {
                         // Do nothing.
                     }
                     Token::DefinedAs => {
@@ -388,16 +379,15 @@ impl Parser {
 
                                 match self.parse_rule() {
                                     // If one or both rep(s) is/are selection, try to merge.
-                                    Ok(rep) => {
-                                        match rep.element {
-                                            Element::Selection(mut w) => v.append(&mut w),
-                                            _ => v.push(rep),
-                                        }
-                                    }
+                                    Ok(rep) => match rep.element {
+                                        Element::Selection(mut w) => v.append(&mut w),
+                                        _ => v.push(rep),
+                                    },
                                     Err(err) => return Err(err),
                                 }
 
-                                rulelist.insert(rulename, Repetition::new(None, Element::Selection(v)));
+                                rulelist
+                                    .insert(rulename, Repetition::new(None, Element::Selection(v)));
                             }
                             None => return Err(AbnfParseError::RuleNotExist),
                         }
@@ -480,7 +470,10 @@ impl Parser {
                     if v.len() == 1 {
                         sv.push(v.pop().unwrap());
                     } else {
-                        sv.push(Repetition::new(None, Element::Sequence(v.drain(..).collect())));
+                        sv.push(Repetition::new(
+                            None,
+                            Element::Sequence(v.drain(..).collect()),
+                        ));
                     }
                 }
                 _ => {
@@ -493,7 +486,10 @@ impl Parser {
             if v.len() == 1 {
                 sv.push(v.pop().unwrap());
             } else {
-                sv.push(Repetition::new(None, Element::Sequence(v.drain(..).collect())));
+                sv.push(Repetition::new(
+                    None,
+                    Element::Sequence(v.drain(..).collect()),
+                ));
             }
             Ok(Repetition::new(None, Element::Selection(sv)))
         } else if v.len() == 1 {
@@ -530,13 +526,17 @@ pub fn parse_file(filename: &str) -> std::io::Result<()> {
             }
         }
         Err(err) => {
-            println!("Error: {:?} at line {}, pos {}", err, parser.line(), parser.pos());
+            println!(
+                "Error: {:?} at line {}, pos {}",
+                err,
+                parser.line(),
+                parser.pos()
+            );
         }
     }
 
     Ok(())
 }
-
 
 #[cfg(test)]
 mod test {
@@ -544,7 +544,7 @@ mod test {
 
     #[test]
     pub fn test_get_token_1() {
-        let str  = "  abc ";
+        let str = "  abc ";
         let mut parser = Parser::new(str.to_string());
 
         let token = parser.get_token().unwrap();
@@ -687,7 +687,7 @@ mod test {
         assert_eq!(token, Token::Whitespace("   ".to_string()));
 
         match parser.get_token() {
-            Err(AbnfParseError::TokenParseError) => { /* ok */ },
+            Err(AbnfParseError::TokenParseError) => { /* ok */ }
             Err(err) => assert!(false, "{:?}", err),
             _ => assert!(false),
         }
@@ -697,9 +697,9 @@ mod test {
     pub fn test_get_token_invalid_2() {
         let str = "%x20.21-22";
         let mut parser = Parser::new(str.to_string());
-        
+
         match parser.get_token() {
-            Err(AbnfParseError::ParseIntError(_)) => { /* ok */ },
+            Err(AbnfParseError::ParseIntError(_)) => { /* ok */ }
             Err(err) => assert!(false, "{:?}", err),
             _ => assert!(false),
         }
@@ -711,14 +711,32 @@ mod test {
         let str = r#"1*( rule / (*c-wsp c-nl) )"#;
         let mut parser = Parser::new(str.to_string());
         let rep = Repetition {
-            repeat: Some(Repeat { min: Some(1), max: None }),
-            element: Element::Selection(
-                vec![Repetition { repeat: None, element: Element::Rulename("rule".to_string()) },
-                     Repetition { repeat: None,
-                                  element: Element::Sequence(
-                                      vec![Repetition { repeat: Some(Repeat { min: None, max: None }),
-                                                        element: Element::Rulename("c-wsp".to_string()) },
-                                           Repetition { repeat: None, element: Element::Rulename("c-nl".to_string()) }])}])
+            repeat: Some(Repeat {
+                min: Some(1),
+                max: None,
+            }),
+            element: Element::Selection(vec![
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("rule".to_string()),
+                },
+                Repetition {
+                    repeat: None,
+                    element: Element::Sequence(vec![
+                        Repetition {
+                            repeat: Some(Repeat {
+                                min: None,
+                                max: None,
+                            }),
+                            element: Element::Rulename("c-wsp".to_string()),
+                        },
+                        Repetition {
+                            repeat: None,
+                            element: Element::Rulename("c-nl".to_string()),
+                        },
+                    ]),
+                },
+            ]),
         };
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -732,15 +750,32 @@ mod test {
         let mut parser = Parser::new(str.to_string());
         let rep = Repetition {
             repeat: None,
-            element: Element::Sequence(vec![Repetition { repeat: None, element: Element::Rulename("ALPHA".to_string()) },
-                                            Repetition { repeat: Some(Repeat { min: None, max: None }),
-                                                         element: Element::Selection(
-                                                             vec![Repetition { repeat: None,
-                                                                               element: Element::Rulename("ALPHA".to_string()) },
-                                                                  Repetition { repeat: None,
-                                                                               element: Element::Rulename("DIGIT".to_string()) },
-                                                                  Repetition { repeat: None,
-                                                                               element: Element::IString("-".to_string()) }]) }])
+            element: Element::Sequence(vec![
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("ALPHA".to_string()),
+                },
+                Repetition {
+                    repeat: Some(Repeat {
+                        min: None,
+                        max: None,
+                    }),
+                    element: Element::Selection(vec![
+                        Repetition {
+                            repeat: None,
+                            element: Element::Rulename("ALPHA".to_string()),
+                        },
+                        Repetition {
+                            repeat: None,
+                            element: Element::Rulename("DIGIT".to_string()),
+                        },
+                        Repetition {
+                            repeat: None,
+                            element: Element::IString("-".to_string()),
+                        },
+                    ]),
+                },
+            ]),
         };
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -754,12 +789,26 @@ mod test {
                                 ; continues if next line starts
                                 ;  with white space"#;
         let mut parser = Parser::new(str.to_string());
-        let rep = Repetition{
+        let rep = Repetition {
             repeat: None,
-            element: Element::Sequence(vec![Repetition { repeat: None, element: Element::Rulename("rulename".to_string()) },
-                                            Repetition { repeat: None, element: Element::Rulename("defined-as".to_string()) },
-                                            Repetition { repeat: None, element: Element::Rulename("elements".to_string()) },
-                                            Repetition { repeat: None, element: Element::Rulename("c-nl".to_string()) }])
+            element: Element::Sequence(vec![
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("rulename".to_string()),
+                },
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("defined-as".to_string()),
+                },
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("elements".to_string()),
+                },
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("c-nl".to_string()),
+                },
+            ]),
         };
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -775,14 +824,35 @@ mod test {
         let mut parser = Parser::new(str.to_string());
         let rep = Repetition {
             repeat: None,
-            element: Element::Sequence(
-                vec![Repetition { repeat: Some(Repeat { min: None, max: None }),
-                                  element: Element::Rulename("c-wsp".to_string()) },
-                     Repetition { repeat: None, element: Element::Selection(
-                         vec![Repetition { repeat: None, element: Element::IString("=".to_string()) },
-                              Repetition { repeat: None, element: Element::IString("=/".to_string()) }]) },
-                     Repetition { repeat: Some(Repeat { min: None, max: None }),
-                                  element: Element::Rulename("c-wsp".to_string()) }])
+            element: Element::Sequence(vec![
+                Repetition {
+                    repeat: Some(Repeat {
+                        min: None,
+                        max: None,
+                    }),
+                    element: Element::Rulename("c-wsp".to_string()),
+                },
+                Repetition {
+                    repeat: None,
+                    element: Element::Selection(vec![
+                        Repetition {
+                            repeat: None,
+                            element: Element::IString("=".to_string()),
+                        },
+                        Repetition {
+                            repeat: None,
+                            element: Element::IString("=/".to_string()),
+                        },
+                    ]),
+                },
+                Repetition {
+                    repeat: Some(Repeat {
+                        min: None,
+                        max: None,
+                    }),
+                    element: Element::Rulename("c-wsp".to_string()),
+                },
+            ]),
         };
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -798,18 +868,33 @@ mod test {
         let mut parser = Parser::new(str.to_string());
         let rep = Repetition {
             repeat: None,
-            element: Element::Sequence(
-                vec![Repetition { repeat: None,
-                                  element: Element::Rulename("DQUOTE".to_string()) },
-                     Repetition { repeat:
-                                  Some(Repeat { min: None, max: None }),
-                                  element: Element::Selection(
-                                      vec![Repetition { repeat: None,
-                                                        element: Element::ValueRange((32, 33)) },
-                                           Repetition { repeat: None,
-                                                        element: Element::ValueRange((35, 126)) }])},
-                     Repetition { repeat: None,
-                                  element: Element::Rulename("DQUOTE".to_string()) }]) };
+            element: Element::Sequence(vec![
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("DQUOTE".to_string()),
+                },
+                Repetition {
+                    repeat: Some(Repeat {
+                        min: None,
+                        max: None,
+                    }),
+                    element: Element::Selection(vec![
+                        Repetition {
+                            repeat: None,
+                            element: Element::ValueRange((32, 33)),
+                        },
+                        Repetition {
+                            repeat: None,
+                            element: Element::ValueRange((35, 126)),
+                        },
+                    ]),
+                },
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("DQUOTE".to_string()),
+                },
+            ]),
+        };
 
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -823,12 +908,35 @@ mod test {
         let mut parser = Parser::new(str.to_string());
         let rep = Repetition {
             repeat: None,
-            element: Element::Sequence(
-                vec![Repetition { repeat: None, element: Element::IString("(".to_string()) },
-                     Repetition { repeat: Some(Repeat { min: None, max: None }), element: Element::Rulename("c-wsp".to_string()) },
-                     Repetition { repeat: None, element: Element::Rulename("alternation".to_string()) },
-                     Repetition { repeat: Some(Repeat { min: None, max: None }), element: Element::Rulename("c-wsp".to_string()) },
-                     Repetition { repeat: None, element: Element::IString(")".to_string()) }]) };
+            element: Element::Sequence(vec![
+                Repetition {
+                    repeat: None,
+                    element: Element::IString("(".to_string()),
+                },
+                Repetition {
+                    repeat: Some(Repeat {
+                        min: None,
+                        max: None,
+                    }),
+                    element: Element::Rulename("c-wsp".to_string()),
+                },
+                Repetition {
+                    repeat: None,
+                    element: Element::Rulename("alternation".to_string()),
+                },
+                Repetition {
+                    repeat: Some(Repeat {
+                        min: None,
+                        max: None,
+                    }),
+                    element: Element::Rulename("c-wsp".to_string()),
+                },
+                Repetition {
+                    repeat: None,
+                    element: Element::IString(")".to_string()),
+                },
+            ]),
+        };
 
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -843,28 +951,62 @@ mod test {
         let mut parser = Parser::new(str.to_string());
         let rep = Repetition {
             repeat: None,
-            element: Element::Sequence(
-                vec![Repetition { repeat: None,
-                                  element: Element::IString("d".to_string()) },
-                     Repetition { repeat: Some(Repeat { min: Some(1), max: None }),
-                                  element: Element::Rulename("DIGIT".to_string()) },
-                     Repetition { repeat: Some(Repeat { min: Some(0), max: Some(1) }),
-                                  element: Element::Selection(
-                                      vec![Repetition { repeat: Some(Repeat { min: Some(1), max: None }),
-                                                        element: Element::Sequence(
-                                                            vec![Repetition { repeat: None,
-                                                                              element: Element::IString(".".to_string()) },
-                                                                 Repetition { repeat: Some(Repeat { min: Some(1), max: None }),
-                                                                              element: Element::Rulename("DIGIT".to_string()) }]) },
-                                           Repetition { repeat: None,
-                                                        element: Element::Sequence(
-                                                            vec![Repetition { repeat: None,
-                                                                              element: Element::IString("-".to_string()) },
-                                                                 Repetition { repeat: Some(Repeat { min: Some(1), max: None }),
-                                                                              element: Element::Rulename("DIGIT".to_string())
-                                                                 }])
-                                           }])
-                     }])
+            element: Element::Sequence(vec![
+                Repetition {
+                    repeat: None,
+                    element: Element::IString("d".to_string()),
+                },
+                Repetition {
+                    repeat: Some(Repeat {
+                        min: Some(1),
+                        max: None,
+                    }),
+                    element: Element::Rulename("DIGIT".to_string()),
+                },
+                Repetition {
+                    repeat: Some(Repeat {
+                        min: Some(0),
+                        max: Some(1),
+                    }),
+                    element: Element::Selection(vec![
+                        Repetition {
+                            repeat: Some(Repeat {
+                                min: Some(1),
+                                max: None,
+                            }),
+                            element: Element::Sequence(vec![
+                                Repetition {
+                                    repeat: None,
+                                    element: Element::IString(".".to_string()),
+                                },
+                                Repetition {
+                                    repeat: Some(Repeat {
+                                        min: Some(1),
+                                        max: None,
+                                    }),
+                                    element: Element::Rulename("DIGIT".to_string()),
+                                },
+                            ]),
+                        },
+                        Repetition {
+                            repeat: None,
+                            element: Element::Sequence(vec![
+                                Repetition {
+                                    repeat: None,
+                                    element: Element::IString("-".to_string()),
+                                },
+                                Repetition {
+                                    repeat: Some(Repeat {
+                                        min: Some(1),
+                                        max: None,
+                                    }),
+                                    element: Element::Rulename("DIGIT".to_string()),
+                                },
+                            ]),
+                        },
+                    ]),
+                },
+            ]),
         };
 
         if let Ok(r) = parser.parse_rule() {
@@ -873,13 +1015,13 @@ mod test {
     }
 
     // TODO more parse tests.
-    
+
     #[test]
     pub fn test_parse_1() {
         let str = r#"   "Hello world""#;
         let mut parser = Parser::new(str.to_string());
         match parser.parse() {
-            Err(AbnfParseError::ExpectRulename(_)) => {},
+            Err(AbnfParseError::ExpectRulename(_)) => {}
             Err(e) => assert!(false, "Unexpected error {:?}", e),
             Ok(_) => assert!(false, "Not OK"),
         }
@@ -899,13 +1041,34 @@ mod test {
             Err(e) => assert!(false, "error {:?}", e),
             Ok(r) => {
                 let rep = r.get("ruleset").unwrap();
-                assert_eq!(rep, &Repetition {
-                    repeat: None,
-                    element: Element::Selection(vec![Repetition { repeat: None, element: Element::Rulename("alt1".to_string()) },
-                                                     Repetition { repeat: None, element: Element::Rulename("alt2".to_string()) },
-                                                     Repetition { repeat: None, element: Element::Rulename("alt3".to_string()) },
-                                                     Repetition { repeat: None, element: Element::Rulename("alt4".to_string()) },
-                                                     Repetition { repeat: None, element: Element::Rulename("alt5".to_string()) }]) })
+                assert_eq!(
+                    rep,
+                    &Repetition {
+                        repeat: None,
+                        element: Element::Selection(vec![
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt1".to_string())
+                            },
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt2".to_string())
+                            },
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt3".to_string())
+                            },
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt4".to_string())
+                            },
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt5".to_string())
+                            }
+                        ])
+                    }
+                )
             }
         }
     }
@@ -924,13 +1087,34 @@ mod test {
             Err(e) => assert!(false, "error {:?}", e),
             Ok(r) => {
                 let rep = r.get("ruleset").unwrap();
-                assert_eq!(rep, &Repetition {
-                    repeat: None,
-                    element: Element::Selection(vec![Repetition { repeat: None, element: Element::Rulename("alt1".to_string()) },
-                                                     Repetition { repeat: None, element: Element::Rulename("alt2".to_string()) },
-                                                     Repetition { repeat: None, element: Element::Rulename("alt3".to_string()) },
-                                                     Repetition { repeat: None, element: Element::Rulename("alt4".to_string()) },
-                                                     Repetition { repeat: None, element: Element::Rulename("alt5".to_string()) }]) })
+                assert_eq!(
+                    rep,
+                    &Repetition {
+                        repeat: None,
+                        element: Element::Selection(vec![
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt1".to_string())
+                            },
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt2".to_string())
+                            },
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt3".to_string())
+                            },
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt4".to_string())
+                            },
+                            Repetition {
+                                repeat: None,
+                                element: Element::Rulename("alt5".to_string())
+                            }
+                        ])
+                    }
+                )
             }
         }
     }
