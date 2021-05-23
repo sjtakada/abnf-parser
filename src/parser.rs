@@ -673,7 +673,7 @@ mod test {
                                                                   Repetition { repeat: None,
                                                                                element: Element::Rulename("DIGIT".to_string()) },
                                                                   Repetition { repeat: None,
-                                                                               element: Element::Literal("-".to_string()) }]) }])
+                                                                               element: Element::CharValue("-".to_string()) }]) }])
         };
         if let Ok(r) = parser.parse_rule() {
             assert_eq!(r, rep);
@@ -692,8 +692,8 @@ mod test {
                 vec![Repetition { repeat: Some(Repeat { min: None, max: None }),
                                   element: Element::Rulename("c-wsp".to_string()) },
                      Repetition { repeat: None, element: Element::Selection(
-                         vec![Repetition { repeat: None, element: Element::Literal("=".to_string()) },
-                              Repetition { repeat: None, element: Element::Literal("=/".to_string()) }]) },
+                         vec![Repetition { repeat: None, element: Element::CharValue("=".to_string()) },
+                              Repetition { repeat: None, element: Element::CharValue("=/".to_string()) }]) },
                      Repetition { repeat: Some(Repeat { min: None, max: None }),
                                   element: Element::Rulename("c-wsp".to_string()) }])
         };
