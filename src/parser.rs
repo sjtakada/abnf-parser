@@ -382,35 +382,16 @@ impl Parser {
                         match rulelist.remove(&rulename) {
                             Some(rep) => {
                                 let mut v = match rep.element {
-                                    Element::Rulename(_) |
-                                    Element::CharValue(_) |
-                                    Element::NumberValue(_) |
-                                    Element::ValueRange(_) |
-                                    Element::ValueSequence(_) |
-                                    Element::ProseValue(_) |
-                                    Element::Sequence(_) => {
-                                        let v: Vec<Repetition> = vec![ rep.clone() ];
-                                        v
-                                    }
                                     Element::Selection(v) => v,
+                                    _ => vec![rep.clone()],
                                 };
 
                                 match self.parse_rule() {
                                     // If one or both rep(s) is/are selection, try to merge.
                                     Ok(rep) => {
                                         match rep.element {
-                                            Element::Rulename(_) |
-                                            Element::CharValue(_) |
-                                            Element::NumberValue(_) |
-                                            Element::ValueRange(_) |
-                                            Element::ValueSequence(_) |
-                                            Element::ProseValue(_) |
-                                            Element::Sequence(_) => {
-                                                v.push(rep);
-                                            }
-                                            Element::Selection(mut w) => {
-                                                v.append(&mut w);
-                                            }
+                                            Element::Selection(mut w) => v.append(&mut w),
+                                            _ => v.push(rep),
                                         }
                                     }
                                     Err(err) => return Err(err),
