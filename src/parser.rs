@@ -687,7 +687,7 @@ mod test {
         assert_eq!(token, Token::Whitespace("   ".to_string()));
 
         match parser.get_token() {
-            Err(AbnfParseError::TokenParseError) => { },
+            Err(AbnfParseError::TokenParseError) => { /* ok */ },
             Err(err) => assert!(false, "{:?}", err),
             _ => assert!(false),
         }
@@ -699,7 +699,7 @@ mod test {
         let mut parser = Parser::new(str.to_string());
         
         match parser.get_token() {
-            Err(AbnfParseError::ParseIntError) => { },
+            Err(AbnfParseError::ParseIntError(_)) => { /* ok */ },
             Err(err) => assert!(false, "{:?}", err),
             _ => assert!(false),
         }

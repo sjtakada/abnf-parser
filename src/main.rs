@@ -20,6 +20,9 @@ fn main() {
     if args.len() == 1 {
         print_help(&program);
     } else {
-        parser::parse_file(&args[1]).unwrap();
+        match parser::parse_file(&args[1]) {
+            Ok(_) => { }
+            Err(e) => println!("Error: {:?}", e.to_string()),
+        }
     }
 }
