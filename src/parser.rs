@@ -7,11 +7,12 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
+use std::fmt;
 
 use super::error::*;
 
 /// An individual element in an ABNF rule.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub enum Element {
     /// rulename.
     Rulename(String),
@@ -31,6 +32,22 @@ pub enum Element {
     Sequence(Vec<Repetition>),
     /// alternation.
     Selection(Vec<Repetition>),
+}
+
+impl fmt::Debug for Element {
+    fn fmt (&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &*self {
+            Element::Rulename(s) => write!(f, "Element::Rulename({:?}.to_string())", s),
+            Element::IString(s) => write!(f, "Element::IString({:?}.to_string())", s),
+            Element::SString(s) => write!(f, "Element::SString({:?}.to_string())", s),
+            Element::NumberValue(n) => write!(f, "Element::NumberValue({:?})", n),
+            Element::ValueRange(t) => write!(f, "Element::ValueRange({:?})", t),
+            Element::ValueSequence(v) => write!(f, "Element::ValueSequence(vec!{:?})", v),
+            Element::ProseValue(s) => write!(f, "Element::ProseValue({:?}.to_string())", s),
+            Element::Sequence(v) => write!(f, "Element::Sequence(vec!{:?})", v),
+            Element::Selection(v) => write!(f, "Element::Selection(vec!{:?})", v),
+        }
+    }
 }
 
 /// Repeat.
@@ -521,9 +538,9 @@ pub fn parse_file(filename: &str) -> std::io::Result<()> {
 
     match parser.parse() {
         Ok(rl) => {
-            for (k, v) in rl {
-                println!("{:?} => {:?}", k, v);
-            }
+//            println!("{:?}", rl);
+
+            rulelist_dump("hoge", &rl);
         }
         Err(err) => {
             println!(
@@ -536,6 +553,20 @@ pub fn parse_file(filename: &str) -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+pub fn rulelist_dump(name: &str, rl: &Rulelist) {
+    println!(r#"pub fn get_{}_rulelist() -> Rulelist {{"#, name);
+    println!(r#"    let mut rl: Rulelist = Rulelist::new();"#);
+    println!(r#""#);
+    
+    for (k, v) in rl {
+        println!(r#"    rl.insert("{}".to_string(), {:?});"#, k, v);
+    }
+
+    println!(r#""#);
+    println!(r#"    rl"#);
+    println!(r#"}}"#);
 }
 
 #[cfg(test)]
