@@ -6,5 +6,6 @@
 //   Copyright (C) 2021 Toshiaki Takada
 //
 
+pub mod element;
 pub mod error;
 pub mod parser;

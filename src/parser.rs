@@ -4,63 +4,15 @@
 //
 
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::Error;
+use std::io::ErrorKind;
+use std::path::Path;
 
+use super::element::*;
 use super::error::*;
-
-/// An individual element in an ABNF rule.
-#[derive(PartialEq, Debug, Clone)]
-pub enum Element {
-    /// rulename.
-    Rulename(String),
-    /// case insensitive string.
-    IString(String),
-    /// case seisitve string.
-    SString(String),
-    /// num-val.
-    NumberValue(u32),
-    /// range of num-val.
-    ValueRange((u32, u32)),
-    /// sequence of num-val.
-    ValueSequence(Vec<u32>),
-    /// prose-val.
-    ProseValue(String),
-    /// concatination.
-    Sequence(Vec<Repetition>),
-    /// alternation.
-    Selection(Vec<Repetition>),
-}
-
-/// Repeat.
-#[derive(PartialEq, Debug, Clone)]
-pub struct Repeat {
-    min: Option<usize>,
-    max: Option<usize>,
-}
-
-impl Repeat {
-    pub fn new(min: Option<usize>, max: Option<usize>) -> Repeat {
-        Repeat { min, max }
-    }
-}
-
-/// Element with repeat.
-#[derive(PartialEq, Debug, Clone)]
-pub struct Repetition {
-    repeat: Option<Repeat>,
-    element: Element,
-}
-
-impl Repetition {
-    pub fn new(repeat: Option<Repeat>, element: Element) -> Repetition {
-        Repetition { repeat, element }
-    }
-}
-
-/// Rulelist.
-type Rulelist = HashMap<String, Repetition>;
 
 /// ABNF Token type.
 #[derive(PartialEq, Debug)]
@@ -515,15 +467,20 @@ fn is_rule_delimiter(input: &str) -> bool {
 pub fn parse_file(filename: &str) -> std::io::Result<()> {
     let mut f = File::open(filename)?;
     let mut s = String::new();
+    let p = Path::new(filename)
+        .file_stem()
+        .ok_or(Error::new(ErrorKind::Other, "Invalid filename"))?;
+    let n1 = p
+        .to_str()
+        .ok_or(Error::new(ErrorKind::Other, "Invalid filename"))?;
+    let n2 = str::replace(n1, ".", "_");
 
     f.read_to_string(&mut s)?;
     let mut parser = Parser::new(s);
 
     match parser.parse() {
         Ok(rl) => {
-            for (k, v) in rl {
-                println!("{:?} => {:?}", k, v);
-            }
+            rulelist_dump(&n2, &rl)?;
         }
         Err(err) => {
             println!(
@@ -534,6 +491,29 @@ pub fn parse_file(filename: &str) -> std::io::Result<()> {
             );
         }
     }
+
+    Ok(())
+}
+
+pub fn rulelist_dump(name: &str, rl: &Rulelist) -> std::io::Result<()> {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let path = Path::new(&manifest_dir).join("src/element.rs");
+    let mut file = File::open(path)?;
+    let mut elem = String::new();
+    file.read_to_string(&mut elem)?;
+    println!("{}", elem);
+
+    println!(r#"pub fn get_{}_rulelist() -> Rulelist {{"#, name);
+    println!(r#"    let mut rl: Rulelist = Rulelist::new();"#);
+    println!(r#""#);
+
+    for (k, v) in rl {
+        println!(r#"    rl.insert("{}".to_string(), {:?});"#, k, v);
+    }
+
+    println!(r#""#);
+    println!(r#"    rl"#);
+    println!(r#"}}"#);
 
     Ok(())
 }
