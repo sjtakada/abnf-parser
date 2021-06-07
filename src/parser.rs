@@ -9,6 +9,7 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::io::Error;
 use std::io::ErrorKind;
+use std::env;
 
 use super::element::*;
 use super::error::*;
@@ -491,7 +492,9 @@ pub fn parse_file(filename: &str) -> std::io::Result<()> {
 }
 
 pub fn rulelist_dump(name: &str, rl: &Rulelist) -> std::io::Result<()> {
-    let mut file = File::open("src/element.rs")?;
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let path = Path::new(&manifest_dir).join("src/element.rs");
+    let mut file = File::open(path)?;
     let mut elem = String::new();
     file.read_to_string(&mut elem)?;
     println!("{}", elem);
