@@ -4,12 +4,12 @@
 //
 
 use std::cell::Cell;
+use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::Path;
 use std::io::Error;
 use std::io::ErrorKind;
-use std::env;
+use std::path::Path;
 
 use super::element::*;
 use super::error::*;
@@ -467,8 +467,12 @@ fn is_rule_delimiter(input: &str) -> bool {
 pub fn parse_file(filename: &str) -> std::io::Result<()> {
     let mut f = File::open(filename)?;
     let mut s = String::new();
-    let p = Path::new(filename).file_stem().ok_or(Error::new(ErrorKind::Other, "Invalid filename"))?;
-    let n1 = p.to_str().ok_or(Error::new(ErrorKind::Other, "Invalid filename"))?;
+    let p = Path::new(filename)
+        .file_stem()
+        .ok_or(Error::new(ErrorKind::Other, "Invalid filename"))?;
+    let n1 = p
+        .to_str()
+        .ok_or(Error::new(ErrorKind::Other, "Invalid filename"))?;
     let n2 = str::replace(n1, ".", "_");
 
     f.read_to_string(&mut s)?;
@@ -502,7 +506,7 @@ pub fn rulelist_dump(name: &str, rl: &Rulelist) -> std::io::Result<()> {
     println!(r#"pub fn get_{}_rulelist() -> Rulelist {{"#, name);
     println!(r#"    let mut rl: Rulelist = Rulelist::new();"#);
     println!(r#""#);
-    
+
     for (k, v) in rl {
         println!(r#"    rl.insert("{}".to_string(), {:?});"#, k, v);
     }

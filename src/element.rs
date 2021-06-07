@@ -25,7 +25,7 @@ pub enum Element {
 }
 
 impl fmt::Debug for Element {
-    fn fmt (&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &*self {
             Element::Rulename(s) => write!(f, "Element::Rulename({:?}.to_string())", s),
             Element::IString(s) => write!(f, "Element::IString({:?}.to_string())", s),
@@ -68,4 +68,3 @@ impl Repetition {
 
 /// Rulelist.
 pub type Rulelist = HashMap<String, Repetition>;
-
